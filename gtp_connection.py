@@ -20,6 +20,7 @@ from board_util import (
 )
 import numpy as np
 import re
+import time
 
 
 class GtpConnection:
@@ -37,6 +38,7 @@ class GtpConnection:
         self._debug_mode = debug_mode
         self.go_engine = go_engine
         self.board = board
+        self.timeLimit = None
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
             "quit": self.quit_cmd,
@@ -57,7 +59,8 @@ class GtpConnection:
             "gogui-rules_side_to_move": self.gogui_rules_side_to_move_cmd,
             "gogui-rules_board": self.gogui_rules_board_cmd,
             "gogui-rules_final_result": self.gogui_rules_final_result_cmd,
-            "gogui-analyze_commands": self.gogui_analyze_cmd
+            "gogui-analyze_commands": self.gogui_analyze_cmd,
+            "timelimit": self.time_limit_cmd
         }
 
         # used for argument checking
@@ -70,6 +73,7 @@ class GtpConnection:
             "genmove": (1, "Usage: genmove {w,b}"),
             "play": (2, "Usage: play {b,w} MOVE"),
             "legal_moves": (1, "Usage: legal_moves {w,b}"),
+			"timelimit": (1, "Usage: timelimit SECONDS")
         }
 
     def write(self, data):
@@ -250,6 +254,13 @@ class GtpConnection:
         except Exception as e:
             self.respond("illegal move: {}".format(str(e).replace('\'','')))
     
+    def time_limit_cmd(self, args):
+        if (1 <= int(args[0]) <= 100 ):
+            self.timeLimit = int(args[0])
+            self.respond()
+        else:
+            self.respond("illegal time: \"{} \" ".format(args[0]))
+
     def genmove_cmd(self, args):
         """
         Generate a move for the color args[0] in {'b', 'w'}, for the game of gomoku.
