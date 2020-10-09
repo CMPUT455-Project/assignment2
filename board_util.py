@@ -180,3 +180,16 @@ class GoBoardUtil(object):
             start = goboard.row_start(row + 1)
             board2d[row, :] = goboard.board[start : start + size]
         return board2d
+    
+    @staticmethod
+    def get_board_1d(board):
+        """
+        Return: numpy array
+        a one dimensional numpy array where the stone as the board
+        """
+
+        blackNum = where1d(board == BLACK)
+        whiteNum = where1d(board == WHITE)
+        emptyNum = where1d(board == EMPTY)
+        board1d = np.concatenate([blackNum,whiteNum,emptyNum])
+        return board1d

@@ -10,6 +10,7 @@ The board uses a 1-dimensional representation with padding
 """
 
 import numpy as np
+import time
 from board_util import (
     GoBoardUtil,
     BLACK,
@@ -24,6 +25,8 @@ from board_util import (
     MAXSIZE,
     GO_POINT
 )
+
+from transpositionTable import TranspositionTable
 
 """
 The GoBoard class implements a board and basic functions to play
@@ -113,6 +116,9 @@ class GoBoard(object):
         self.maxpoint = size * size + 3 * (size + 1)
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
+        self.winningMove = None
+        self.drawWinner = EMPTY
+        self.time = None
 
     def copy(self):
         b = GoBoard(self.size)
@@ -122,6 +128,9 @@ class GoBoard(object):
         b.last_move = self.last_move
         b.last2_move = self.last2_move
         b.current_player = self.current_player
+        b.winningMove = self.winningMove
+        b.drawWinner = self.drawWinner
+        b.time = self.time
         assert b.maxpoint == self.maxpoint
         b.board = np.copy(self.board)
         return b
@@ -297,6 +306,12 @@ class GoBoard(object):
         self.last_move = point
         return True
 
+    def undo_move(self, point):
+        self.board[point] = EMPTY
+        self.current_player = GoBoardUtil.opponent(self.current_player)
+        self.last_move = self.last2_move
+        self.last2_move = None
+
     def neighbors_of_color(self, point, color):
         """ List of neighbors of point of given color """
         nbc = []
@@ -365,3 +380,58 @@ class GoBoard(object):
             if counter == 5 and prev != EMPTY:
                 return prev
         return EMPTY
+
+    def code(self):
+        board1d = GoBoardUtil.get_board_1d(self.board)
+        c = 0
+        for i in board1d:
+            c += self.board[i] * (3 ** (i - self.size - 1))
+        return c
+
+    def staticallyEvaluateForToPlay(self, winColor):
+        if (winColor == EMPTY) and (self.drawWinner != EMPTY):
+            winColor = self.drawWinner
+        if winColor == self.current_player:
+            return True
+        assert winColor == GoBoardUtil.opponent(self.current_player)
+        return False
+
+    def storeResult(self, tt, result):
+        tt.store(self.code(), result)
+        return result
+
+    def negamaxBoolean(self, tt, timelimit):
+        if time.time() - self.time > timelimit:
+            return False
+        
+        result = tt.lookup(self.code())
+        if result != None:
+            return result
+        winner = self.detect_five_in_a_row()
+        if winner != EMPTY:
+            result = self.staticallyEvaluateForToPlay(winner)
+            print("end ", result)
+            return self.storeResult(tt, result)
+
+        validPoints = self.get_empty_points()
+        #draw
+        if winner == EMPTY and len(validPoints) == 0:
+            # print(self.current_player, "draw")
+            if self.drawWinner == self.current_player:
+                return True
+            else:
+                return False
+        # print("here it is ", self.current_player)
+        
+        for m in validPoints:
+            if self.is_legal(m, self.current_player):
+                # print(self.current_player, " make a move ", m)
+                boardcopy = self.copy()
+                boardcopy.play_move(m, self.current_player)
+                success = not boardcopy.negamaxBoolean(tt, timelimit)
+                boardcopy.undo_move(m)
+                if success == True:
+                    self.winningMove = m
+                    # print(boardcopy.current_player, " wins with move ", m)
+                    return self.storeResult(tt, True)
+        return self.storeResult(tt, False)

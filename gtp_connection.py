@@ -22,6 +22,7 @@ import numpy as np
 import re
 import time
 
+from transpositionTable import TranspositionTable
 
 class GtpConnection:
     def __init__(self, go_engine, board, debug_mode=False):
@@ -60,7 +61,8 @@ class GtpConnection:
             "gogui-rules_board": self.gogui_rules_board_cmd,
             "gogui-rules_final_result": self.gogui_rules_final_result_cmd,
             "gogui-analyze_commands": self.gogui_analyze_cmd,
-            "timelimit": self.time_limit_cmd
+            "timelimit": self.time_limit_cmd,
+            "solve": self.solve_cmd
         }
 
         # used for argument checking
@@ -260,6 +262,34 @@ class GtpConnection:
             self.respond()
         else:
             self.respond("illegal time: \"{} \" ".format(args[0]))
+
+    def solve_cmd(self, args):
+        def call_search():
+            tt = TranspositionTable() # use separate table for each color
+            return self.board.negamaxBoolean(tt, self.timeLimit)
+        
+        self.board.time = time.time()
+
+        savedColor = self.board.current_player
+        self.board.drawWinner = GoBoardUtil.opponent(self.board.current_player)
+        win  = call_search()
+
+        if self.timeLimit < time.time() - self.board.time:
+            self.respond("unknown")
+            return
+        if win == True:
+            move_coord = point_to_coord(self.board.winningMove, self.board.size)
+            self.respond("{} wins with move {}\n".format(self.board.current_player, format_point(move_coord)))
+            return
+        
+        self.board.drawWinner = self.board.current_player
+
+        if call_search():
+            move_coord = point_to_coord(self.board.winningMove, self.board.size)
+            self.respond("draw with move {}\n".format(format_point(move_coord)))
+        else:
+            self.respond("lose to {}".format(GoBoardUtil.opponent(self.board.current_player)))
+        return
 
     def genmove_cmd(self, args):
         """
