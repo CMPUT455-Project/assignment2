@@ -22,7 +22,6 @@ import numpy as np
 import re
 import time
 
-
 class GtpConnection:
     def __init__(self, go_engine, board, debug_mode=False):
         """
@@ -60,7 +59,8 @@ class GtpConnection:
             "gogui-rules_board": self.gogui_rules_board_cmd,
             "gogui-rules_final_result": self.gogui_rules_final_result_cmd,
             "gogui-analyze_commands": self.gogui_analyze_cmd,
-            "timelimit": self.time_limit_cmd
+            "timelimit": self.time_limit_cmd,
+            "solve": self.solve_cmd
         }
 
         # used for argument checking
@@ -260,6 +260,30 @@ class GtpConnection:
             self.respond()
         else:
             self.respond("illegal time: \"{} \" ".format(args[0]))
+
+    def solve_cmd(self, args):
+        savedColor = self.board.current_player
+        self.board.time = time.time()
+        [result, point] = self.board.minimax('or', self.timeLimit, self.board.current_player)
+
+        if result == "unknown":
+            self.respond('unknown')
+        elif result == True:
+            if point == 1:
+                self.respond(savedColor)
+            else:
+                move_coord = point_to_coord(point, self.board.size)
+                move_as_string = format_point(move_coord)
+                self.respond("{} {}\n".format(savedColor, move_as_string))
+        elif result == "draw":
+            move_coord = point_to_coord(point, self.board.size)
+            move_as_string = format_point(move_coord)
+            self.respond("draw {}\n".format(move_as_string))
+        elif result == False:
+            self.respond(GoBoardUtil.opponent(savedColor))
+
+        
+        return
 
     def genmove_cmd(self, args):
         """

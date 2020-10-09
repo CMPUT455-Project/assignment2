@@ -10,6 +10,8 @@ The board uses a 1-dimensional representation with padding
 """
 
 import numpy as np
+import time
+import random
 from board_util import (
     GoBoardUtil,
     BLACK,
@@ -113,6 +115,7 @@ class GoBoard(object):
         self.maxpoint = size * size + 3 * (size + 1)
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
+        self.time = None
 
     def copy(self):
         b = GoBoard(self.size)
@@ -122,6 +125,7 @@ class GoBoard(object):
         b.last_move = self.last_move
         b.last2_move = self.last2_move
         b.current_player = self.current_player
+        b.time = self.time
         assert b.maxpoint == self.maxpoint
         b.board = np.copy(self.board)
         return b
@@ -297,6 +301,12 @@ class GoBoard(object):
         self.last_move = point
         return True
 
+    def undo_move(self, point):
+        self.board[point] = EMPTY
+        self.current_player = GoBoardUtil.opponent(self.current_player)
+        self.last_move = self.last2_move
+        self.last2_move = None
+
     def neighbors_of_color(self, point, color):
         """ List of neighbors of point of given color """
         nbc = []
@@ -329,6 +339,13 @@ class GoBoard(object):
         if self.last2_move != None and self.last2_move != PASS:
             board_moves.append(self.last2_move)
             return 
+
+    
+
+    ##################################################
+    # there is a bug when setting board to 5 * 5 size using default detect function
+    # TODO: implement own function to do the correspond detection
+    ##################################################
 
     def detect_five_in_a_row(self):
         """
@@ -365,3 +382,162 @@ class GoBoard(object):
             if counter == 5 and prev != EMPTY:
                 return prev
         return EMPTY
+
+    def check_num_in_direction(self, color, point, direction, num):
+        count = 1
+        points = []
+
+        curPoint = point
+        while True:
+            curPoint = curPoint + direction
+            if self.board[curPoint] == color:
+                count += 1
+                if count == num:
+                    if self.NS < (curPoint + direction) <= (self.NS * self.size + self.size) and self.board[(curPoint + direction)] == EMPTY:
+                        points.append(curPoint + direction)
+                    elif self.NS < (curPoint - direction) <= (self.NS * self.size + self.size) and self.board[(curPoint - direction)] == EMPTY:
+                        points.append(curPoint - direction)
+                    break
+            else:
+                break
+        
+        curPoint = point
+        while True:
+            curPoint = curPoint - direction
+            if self.board[curPoint] == color:
+                count += 1
+                if count == num:
+                    if self.NS <= (curPoint - direction) <= (self.NS * self.size + self.size) and self.board[(curPoint - direction)] == EMPTY:
+                        points.append(curPoint - direction)
+                    break
+            else:
+                break
+        return points
+
+    def detect_n_points(self, point, n):
+        color = self.board[point]
+        points = self.check_num_in_direction(color, point, 1, n)
+
+        points += self.check_num_in_direction(color, point, self.NS, n)
+
+        points += self.check_num_in_direction(color, point, self.NS+1, n)
+
+        points += self.check_num_in_direction(color, point, self.NS-1, n)
+
+        if not points:
+            return None
+        else:
+            result = list(set(points))
+            return result
+    
+    def optimize_states(self, color):
+
+        def helper(color_points, num_points, num):
+            for point in color_points:
+                temp = self.detect_n_points(point, num)
+                if temp:
+                    num_points += [i for i in temp if i not in num_points]
+            return num_points
+
+        white_points = self.get_color_points(WHITE)
+        black_points = self.get_color_points(BLACK)
+
+        four_points = []
+        three_points = []
+        two_points = []
+        one_point = []
+
+        result = []
+        legalMoves = self.get_empty_points()
+
+        if color == BLACK:            
+            four_points = helper(black_points, four_points, 4)
+            three_points = helper(black_points, four_points, 3)
+            result = four_points + [i for i in three_points if i not in four_points]
+            two_points = helper(black_points, three_points, 2)
+            result = result + [i for i in two_points if i not in result]
+            one_point = helper(black_points, two_points, 1)
+            result = result + [i for i in one_point if i not in result]
+
+            result = result + [i for i in legalMoves if i not in result]
+
+        else:
+            four_points = helper(white_points, four_points, 4)
+            three_points = helper(white_points, four_points, 3)
+            result = four_points + [i for i in three_points if i not in four_points]
+            two_points = helper(white_points, three_points, 2)
+            result = result + [i for i in two_points if i not in result]
+            one_point = helper(white_points, two_points, 1)
+            result = result + [i for i in one_point if i not in result]
+
+            result = result + [i for i in legalMoves if i not in result]
+
+        return result
+
+    def minimax(self, symbol, timelimit, color):
+
+        oppoColor = GoBoardUtil.opponent(color)
+        draws = []
+
+        win = self.detect_five_in_a_row()
+
+        if win != EMPTY:
+            if symbol == "or":
+                if win != color:
+
+                    return [False, False]
+                else:
+                    return [True, True]
+            return [False, False]
+        
+        moves = self.optimize_states(color)
+
+        if not moves:
+            return ['draw', False]
+
+
+        for m in moves:
+            self.play_move(m, color)
+            win = self.detect_five_in_a_row()
+
+            if win != EMPTY:
+                if symbol == "or":
+                    self.board[m] = 0
+                    return [True, m]
+                elif win == color:
+                    self.board[m] = 0
+                    return [False, False]
+    
+            
+            if len(self.get_empty_points()) == 0:
+                self.board[m] = 0
+                return ["draw", m]
+            if symbol == "or":
+                [res, move] = self.minimax('and', timelimit, oppoColor)
+            else:
+                [res, move] = self.minimax('or', timelimit, oppoColor)
+            self.undo_move(m)
+
+            if time.time() - self.time > timelimit:
+                return ['unknown', False]
+
+            if symbol == "or":
+                if res == True:
+                    return [True, m]
+            else:
+                if res == False:
+                    return [False, False]
+            
+            if res == "draw":
+                draws.append(m)
+
+            if res == "unknown":
+                return ["unknown", False]
+        
+        if len(draws) > 0:
+            return ["draw", draws[0]]
+        
+        if symbol == "or":
+            return [False, False]
+        else:
+            return [True, True]
