@@ -11,6 +11,7 @@ The board uses a 1-dimensional representation with padding
 
 import numpy as np
 import time
+import random
 from board_util import (
     GoBoardUtil,
     BLACK,
@@ -27,7 +28,6 @@ from board_util import (
 )
 
 from transpositionTable import TranspositionTable
-
 """
 The GoBoard class implements a board and basic functions to play
 moves, check the end of the game, and count the acore at the end.
@@ -119,6 +119,7 @@ class GoBoard(object):
         self.winningMove = None
         self.drawWinner = EMPTY
         self.time = None
+        self.zobTable = None
 
     def copy(self):
         b = GoBoard(self.size)
@@ -130,6 +131,7 @@ class GoBoard(object):
         b.current_player = self.current_player
         b.winningMove = self.winningMove
         b.drawWinner = self.drawWinner
+        b.zobTable = self.zobTable
         b.time = self.time
         assert b.maxpoint == self.maxpoint
         b.board = np.copy(self.board)
@@ -381,12 +383,20 @@ class GoBoard(object):
                 return prev
         return EMPTY
 
+    def zobristHash(self):
+        hashValue = 0
+        if not self.zobTable:
+            self.zobTable = [[[random.randint(1,2**10 - 1) for i in range(2)]for j in range(self.size)]for k in range(self.size)]
+        for i in range(self.size):
+            for j in range(self.size):
+                point = coord_to_point(i+1, j+1, self.size)
+                color = self.board[point]
+                if color != EMPTY:
+                    hashValue ^= self.zobTable[i][j][color-1]
+        return hashValue
+
     def code(self):
-        board1d = GoBoardUtil.get_board_1d(self.board)
-        c = 0
-        for i in board1d:
-            c += self.board[i] * (3 ** (i - self.size - 1))
-        return c
+        return self.zobristHash()
 
     def staticallyEvaluateForToPlay(self, winColor):
         if (winColor == EMPTY) and (self.drawWinner != EMPTY):
@@ -413,7 +423,9 @@ class GoBoard(object):
             print("end ", result)
             return self.storeResult(tt, result)
 
-        validPoints = self.get_empty_points()
+        boardCopy = self.copy()
+        validPoints = GoBoardUtil.generate_legal_moves(boardCopy, self.current_player)
+
         #draw
         if winner == EMPTY and len(validPoints) == 0:
             # print(self.current_player, "draw")
@@ -424,14 +436,13 @@ class GoBoard(object):
         # print("here it is ", self.current_player)
         
         for m in validPoints:
-            if self.is_legal(m, self.current_player):
-                # print(self.current_player, " make a move ", m)
-                boardcopy = self.copy()
-                boardcopy.play_move(m, self.current_player)
-                success = not boardcopy.negamaxBoolean(tt, timelimit)
-                boardcopy.undo_move(m)
-                if success == True:
-                    self.winningMove = m
-                    # print(boardcopy.current_player, " wins with move ", m)
-                    return self.storeResult(tt, True)
+            # print(self.current_player, " make a move ", m)
+            boardcopy = self.copy()
+            boardcopy.play_move(m, self.current_player)
+            success = not boardcopy.negamaxBoolean(tt, timelimit)
+            boardcopy.undo_move(m)
+            if success == True:
+                self.winningMove = m
+                print(boardcopy.current_player, " wins with move ", m)
+                return self.storeResult(tt, True)
         return self.storeResult(tt, False)
