@@ -43,7 +43,11 @@ class GoBoard(object):
         """
         assert 2 <= size <= MAXSIZE
         self.reset(size)
+        self.calculate_rows_cols_diags()
 
+    def calculate_rows_cols_diags(self):
+        if self.size < 5:
+            return
         # precalculate all rows, cols, and diags for 5-in-a-row detection
         self.rows = []
         self.cols = []
@@ -56,7 +60,7 @@ class GoBoard(object):
             
             start = self.row_start(1) + i - 1
             current_col = []
-            for pt in range(start, self.row_start(self.size) + i - 1, self.NS):
+            for pt in range(start, self.row_start(self.size) + i, self.NS):
                 current_col.append(pt)
             self.cols.append(current_col)
         
@@ -113,9 +117,10 @@ class GoBoard(object):
         self.last2_move = None
         self.current_player = BLACK
         self.maxpoint = size * size + 3 * (size + 1)
+        self.time = None
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
-        self.time = None
+        self.calculate_rows_cols_diags()
 
     def copy(self):
         b = GoBoard(self.size)
@@ -125,9 +130,9 @@ class GoBoard(object):
         b.last_move = self.last_move
         b.last2_move = self.last2_move
         b.current_player = self.current_player
-        b.time = self.time
         assert b.maxpoint == self.maxpoint
         b.board = np.copy(self.board)
+        b.time = self.time
         return b
 
     def get_color(self, point):
@@ -340,13 +345,6 @@ class GoBoard(object):
             board_moves.append(self.last2_move)
             return 
 
-    
-
-    ##################################################
-    # there is a bug when setting board to 5 * 5 size using default detect function
-    # TODO: implement own function to do the correspond detection
-    ##################################################
-
     def detect_five_in_a_row(self):
         """
         Returns BLACK or WHITE if any five in a row is detected for the color
@@ -382,6 +380,7 @@ class GoBoard(object):
             if counter == 5 and prev != EMPTY:
                 return prev
         return EMPTY
+
 
     def check_num_in_direction(self, color, point, direction, num):
         count = 1
