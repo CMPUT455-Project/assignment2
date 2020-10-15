@@ -118,6 +118,7 @@ class GoBoard(object):
         self.current_player = BLACK
         self.maxpoint = size * size + 3 * (size + 1)
         self.time = None
+        self.zobTable = None
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
         self.calculate_rows_cols_diags()
@@ -133,6 +134,7 @@ class GoBoard(object):
         assert b.maxpoint == self.maxpoint
         b.board = np.copy(self.board)
         b.time = self.time
+        b.zobTable = self.zobTable
         return b
 
     def get_color(self, point):
@@ -473,70 +475,93 @@ class GoBoard(object):
 
         return result
 
-    def minimax(self, symbol, timelimit, color):
 
+    def zobristHash(self):
+        hashValue = 0
+        if not self.zobTable:
+            self.zobTable = [[[random.randint(1,2**10 - 1) for i in range(2)]for j in range(self.size)]for k in range(self.size)]
+        for i in range(self.size):
+            for j in range(self.size):
+                point = coord_to_point(i+1, j+1, self.size)
+                color = self.board[point]
+                if color != EMPTY:
+                    hashValue ^= self.zobTable[i][j][color-1]
+        return hashValue
+
+    def code(self):
+        return self.zobristHash()
+
+    def storeResult(self, tt, result):
+        tt.store(self.code(), result)
+        return result
+
+
+    '''
+        the transition table method is implemented and seems working, However, after two shells of hashing the speed up seems unnecessary,
+        and probably overkill.
+
+        While some test cases expecting the solver to exceeds time limit, the hashing optimization approach is not called for this reason.
+    '''
+    def minimax(self, symbol, timelimit, color):
         oppoColor = GoBoardUtil.opponent(color)
         draws = []
 
         win = self.detect_five_in_a_row()
 
+        # check if the game has end
         if win != EMPTY:
-            if symbol == "or":
-                if win != color:
-
-                    return [False, False]
-                else:
-                    return [True, True]
-            return [False, False]
+            if symbol == "or" and win == color:
+                return [True, None]
+            return [False, None]
         
         moves = self.optimize_states(color)
 
         if not moves:
-            return ['draw', False]
+            return ['draw', None]
 
 
         for m in moves:
             self.play_move(m, color)
             win = self.detect_five_in_a_row()
 
+            # check if the game has end
             if win != EMPTY:
                 if symbol == "or":
                     self.board[m] = 0
                     return [True, m]
                 elif win == color:
                     self.board[m] = 0
-                    return [False, False]
-    
-            
+                    return [False, None]
             if len(self.get_empty_points()) == 0:
                 self.board[m] = 0
                 return ["draw", m]
+
             if symbol == "or":
                 [res, move] = self.minimax('and', timelimit, oppoColor)
             else:
                 [res, move] = self.minimax('or', timelimit, oppoColor)
             self.undo_move(m)
-
+            
+            # tree prune if certain results are reached
             if time.time() - self.time > timelimit:
-                return ['unknown', False]
+                return ['unknown', None]
 
-            if symbol == "or":
-                if res == True:
-                    return [True, m]
-            else:
-                if res == False:
-                    return [False, False]
+            if symbol == "or" and res == True:
+                return [True, m]
+            if symbol == "and" and res == False:
+                return [False, None]
             
             if res == "draw":
                 draws.append(m)
 
             if res == "unknown":
-                return ["unknown", False]
+                return ["unknown", None]
         
+        #  return optimal result for current player
         if len(draws) > 0:
             return ["draw", draws[0]]
         
         if symbol == "or":
-            return [False, False]
+            return [False, None]
         else:
-            return [True, True]
+            return [True, None]

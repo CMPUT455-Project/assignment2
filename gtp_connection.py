@@ -262,14 +262,21 @@ class GtpConnection:
             self.respond("illegal time: \"{} \" ".format(args[0]))
 
     def solve_cmd(self, args):
+        def int_to_color(integer):
+            if integer == 1:
+                return "b"
+            else:
+                return "w"
         savedColor = self.board.current_player
+
         self.board.time = time.time()
         [result, point] = self.board.minimax('or', self.timeLimit, self.board.current_player)
 
         if result == "unknown":
             self.respond('unknown')
         elif result == True:
-            if point == 1:
+            savedColor = int_to_color(savedColor)
+            if not point:
                 self.respond(savedColor)
             else:
                 move_coord = point_to_coord(point, self.board.size)
@@ -279,10 +286,11 @@ class GtpConnection:
             move_coord = point_to_coord(point, self.board.size)
             move_as_string = format_point(move_coord)
             self.respond("draw {}\n".format(move_as_string))
-        elif result == False:
-            self.respond(GoBoardUtil.opponent(savedColor))
+        elif not result:
+            res_color =  GoBoardUtil.opponent(savedColor)
+            res_color = int_to_color(res_color)
+            self.respond(res_color)
 
-        
         return
 
     def genmove_cmd(self, args):
@@ -296,14 +304,26 @@ class GtpConnection:
         if self.board.get_empty_points().size == 0:
             self.respond("pass")
             return
+
         board_color = args[0].lower()
         color = color_to_int(board_color)
+
+        self.board.time = time.time()
+        [res, point] = self.board.minimax('or', self.timeLimit, color)
+
+
+        if res and point:
+                move_coord = point_to_coord(point, self.board.size)
+                move_as_string = format_point(move_coord)
+                self.respond(move_as_string.upper())
+                return
+
         move = self.go_engine.get_move(self.board, color)
         move_coord = point_to_coord(move, self.board.size)
         move_as_string = format_point(move_coord)
         if self.board.is_legal(move, color):
             self.board.play_move(move, color)
-            self.respond(move_as_string.lower())
+            self.respond(move_as_string.upper())
         else:
             self.respond("Illegal move: {}".format(move_as_string))
 
