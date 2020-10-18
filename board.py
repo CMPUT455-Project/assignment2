@@ -26,6 +26,7 @@ from board_util import (
     MAXSIZE,
     GO_POINT
 )
+from collections import Counter
 
 """
 The GoBoard class implements a board and basic functions to play
@@ -57,13 +58,13 @@ class GoBoard(object):
             for pt in range(start, start + self.size):
                 current_row.append(pt)
             self.rows.append(current_row)
-            
+
             start = self.row_start(1) + i - 1
             current_col = []
             for pt in range(start, self.row_start(self.size) + i, self.NS):
                 current_col.append(pt)
             self.cols.append(current_col)
-        
+
         self.diags = []
         # diag towards SE, starting from first row (1,1) moving right to (1,n)
         start = self.row_start(1)
@@ -159,7 +160,7 @@ class GoBoard(object):
             The empty points on the board
         """
         return where1d(self.board == EMPTY)
-    
+
     def get_color_points(self, color):
         """
         Return:
@@ -226,7 +227,7 @@ class GoBoard(object):
         """
         Find the block of given stone
         Returns a board of boolean markers which are set for
-        all the points in the block 
+        all the points in the block
         """
         color = self.get_color(stone)
         assert is_black_white(color)
@@ -345,7 +346,7 @@ class GoBoard(object):
             board_moves.append(self.last_move)
         if self.last2_move != None and self.last2_move != PASS:
             board_moves.append(self.last2_move)
-            return 
+            return
 
     def detect_five_in_a_row(self):
         """
@@ -384,7 +385,7 @@ class GoBoard(object):
         return EMPTY
 
 
-    def check_num_in_direction(self, color, point, direction, num):
+    def check_num_in_direction(self, color, point, direction, num): # all open patterns
         count = 1
         points = []
 
@@ -401,7 +402,7 @@ class GoBoard(object):
                     break
             else:
                 break
-        
+
         curPoint = point
         while True:
             curPoint = curPoint - direction
@@ -418,19 +419,26 @@ class GoBoard(object):
     def detect_n_points(self, point, n):
         color = self.board[point]
         points = self.check_num_in_direction(color, point, 1, n)
-
         points += self.check_num_in_direction(color, point, self.NS, n)
-
         points += self.check_num_in_direction(color, point, self.NS+1, n)
-
         points += self.check_num_in_direction(color, point, self.NS-1, n)
 
         if not points:
             return None
         else:
-            result = list(set(points))
-            return result
-    
+            result_set = set(points) # points: may contain duplicate
+
+            # if there are duplicates, those point connect more than one pattern and are more promising
+            contain_intersection = len(result_set) != len(points)
+            if not contain_intersection:
+                return points
+            else:
+                count = Counter(points)
+                # sort dictionary by value
+                sorted_count = {k: v for k, v in sorted(count.items(), key=lambda item: item[1])} # reference: https://stackoverflow.com/a/613218
+                result = list(sorted_count.keys()).reverse()
+                return result # sorted points by number of "intersection" it is
+
     def optimize_states(self, color):
 
         def helper(color_points, num_points, num):
@@ -451,7 +459,7 @@ class GoBoard(object):
         result = []
         legalMoves = self.get_empty_points()
 
-        if color == BLACK:            
+        if color == BLACK: # merge sorted moves
             four_points = helper(black_points, four_points, 4)
             three_points = helper(black_points, four_points, 3)
             result = four_points + [i for i in three_points if i not in four_points]
@@ -513,7 +521,7 @@ class GoBoard(object):
             if symbol == "or" and win == color:
                 return [True, None]
             return [False, None]
-        
+
         moves = self.optimize_states(color)
 
         if not moves:
@@ -541,7 +549,7 @@ class GoBoard(object):
             else:
                 [res, move] = self.minimax('or', timelimit, oppoColor)
             self.undo_move(m)
-            
+
             # tree prune if certain results are reached
             if time.time() - self.time > timelimit:
                 return ['unknown', None]
@@ -550,17 +558,17 @@ class GoBoard(object):
                 return [True, m]
             if symbol == "and" and res == False:
                 return [False, None]
-            
+
             if res == "draw":
                 draws.append(m)
 
             if res == "unknown":
                 return ["unknown", None]
-        
+
         #  return optimal result for current player
         if len(draws) > 0:
             return ["draw", draws[0]]
-        
+
         if symbol == "or":
             return [False, None]
         else:
