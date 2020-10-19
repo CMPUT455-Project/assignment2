@@ -2,8 +2,8 @@
 gtp_connection.py
 Module for playing games of Go using GoTextProtocol
 
-Parts of this code were originally based on the gtp module 
-in the Deep-Go project by Isaac Henrion and Amos Storkey 
+Parts of this code were originally based on the gtp module
+in the Deep-Go project by Isaac Henrion and Amos Storkey
 at the University of Edinburgh.
 """
 import traceback
@@ -31,13 +31,13 @@ class GtpConnection:
         ----------
         go_engine:
             a program that can reply to a set of GTP commandsbelow
-        board: 
+        board:
             Represents the current board state.
         """
         self._debug_mode = debug_mode
         self.go_engine = go_engine
         self.board = board
-        self.timeLimit = None
+        self.timeLimit = 1
         self.commands = {
             "protocol_version": self.protocol_version_cmd,
             "quit": self.quit_cmd,
@@ -84,7 +84,7 @@ class GtpConnection:
 
     def start_connection(self):
         """
-        Start a GTP connection. 
+        Start a GTP connection.
         This function continuously monitors standard input for commands.
         """
         line = stdin.readline()
@@ -223,7 +223,7 @@ class GtpConnection:
             gtp_moves.append(format_point(coords))
         sorted_moves = " ".join(sorted(gtp_moves))
         self.respond(sorted_moves)
-        
+
     def play_cmd(self, args):
         """
         play a move args[1] for given color args[0] in {'b','w'}
@@ -253,7 +253,7 @@ class GtpConnection:
             self.respond()
         except Exception as e:
             self.respond("illegal move: {}".format(str(e).replace('\'','')))
-    
+
     def time_limit_cmd(self, args):
         if (1 <= int(args[0]) <= 100 ):
             self.timeLimit = int(args[0])
@@ -395,7 +395,7 @@ class GtpConnection:
 
 def point_to_coord(point, boardsize):
     """
-    Transform point given as board array index 
+    Transform point given as board array index
     to (row, col) coordinate representation.
     Special case: PASS is not transformed
     """
@@ -451,7 +451,7 @@ def move_to_coord(point_str, board_size):
 def color_to_int(c):
     """convert character to the appropriate integer code"""
     color_to_int = {"b": BLACK, "w": WHITE, "e": EMPTY, "BORDER": BORDER}
-    
+
     try:
         return color_to_int[c]
     except:

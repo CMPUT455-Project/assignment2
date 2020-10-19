@@ -57,13 +57,13 @@ class GoBoard(object):
             for pt in range(start, start + self.size):
                 current_row.append(pt)
             self.rows.append(current_row)
-            
+
             start = self.row_start(1) + i - 1
             current_col = []
             for pt in range(start, self.row_start(self.size) + i, self.NS):
                 current_col.append(pt)
             self.cols.append(current_col)
-        
+
         self.diags = []
         # diag towards SE, starting from first row (1,1) moving right to (1,n)
         start = self.row_start(1)
@@ -118,7 +118,7 @@ class GoBoard(object):
         self.current_player = BLACK
         self.maxpoint = size * size + 3 * (size + 1)
         self.time = None
-        self.zobTable = None
+        self.zobTable = self.code()
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
         self.calculate_rows_cols_diags()
@@ -159,7 +159,7 @@ class GoBoard(object):
             The empty points on the board
         """
         return where1d(self.board == EMPTY)
-    
+
     def get_color_points(self, color):
         """
         Return:
@@ -226,7 +226,7 @@ class GoBoard(object):
         """
         Find the block of given stone
         Returns a board of boolean markers which are set for
-        all the points in the block 
+        all the points in the block
         """
         color = self.get_color(stone)
         assert is_black_white(color)
@@ -345,7 +345,7 @@ class GoBoard(object):
             board_moves.append(self.last_move)
         if self.last2_move != None and self.last2_move != PASS:
             board_moves.append(self.last2_move)
-            return 
+            return
 
     def detect_five_in_a_row(self):
         """
@@ -401,7 +401,7 @@ class GoBoard(object):
                     break
             else:
                 break
-        
+
         curPoint = point
         while True:
             curPoint = curPoint - direction
@@ -430,7 +430,7 @@ class GoBoard(object):
         else:
             result = list(set(points))
             return result
-    
+
     def optimize_states(self, color):
 
         def helper(color_points, num_points, num):
@@ -451,7 +451,7 @@ class GoBoard(object):
         result = []
         legalMoves = self.get_empty_points()
 
-        if color == BLACK:            
+        if color == BLACK:
             four_points = helper(black_points, four_points, 4)
             three_points = helper(black_points, four_points, 3)
             result = four_points + [i for i in three_points if i not in four_points]
@@ -513,7 +513,7 @@ class GoBoard(object):
             if symbol == "or" and win == color:
                 return [True, None]
             return [False, None]
-        
+
         moves = self.optimize_states(color)
 
         if not moves:
@@ -541,7 +541,7 @@ class GoBoard(object):
             else:
                 [res, move] = self.minimax('or', timelimit, oppoColor)
             self.undo_move(m)
-            
+
             # tree prune if certain results are reached
             if time.time() - self.time > timelimit:
                 return ['unknown', None]
@@ -550,17 +550,17 @@ class GoBoard(object):
                 return [True, m]
             if symbol == "and" and res == False:
                 return [False, None]
-            
+
             if res == "draw":
                 draws.append(m)
 
             if res == "unknown":
                 return ["unknown", None]
-        
+
         #  return optimal result for current player
         if len(draws) > 0:
             return ["draw", draws[0]]
-        
+
         if symbol == "or":
             return [False, None]
         else:
