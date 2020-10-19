@@ -4,7 +4,6 @@ Utility functions for Go board.
 """
 
 import numpy as np
-import random
 
 """
 Encoding of colors on and off a Go board.
@@ -15,21 +14,16 @@ BLACK = 1
 WHITE = 2
 BORDER = 3
 
-
 def is_black_white(color):
     return color == BLACK or color == WHITE
 
-
 def is_black_white_empty(color):
     return color == BLACK or color == WHITE or color == EMPTY
-
-
 """
-A GO_POINT is a point on a Go board.
+A Go_point is a point on the Go board.
 It is encoded as a 32-bit integer, using the numpy type.
 """
 GO_POINT = np.int32
-
 """
 Encoding of special pass move
 """
@@ -42,8 +36,7 @@ NULLPOINT = 0
 
 """
 The largest board we allow. 
-To support larger boards the coordinate printing in
-GtpConnection.format_point needs to be changed.
+To support larger boards the coordinate printing needs to be changed.
 """
 MAXSIZE = 25
 
@@ -52,11 +45,10 @@ where1d: Helper function for using np.where with 1-d arrays.
 The result of np.where is a tuple which contains the indices 
 of elements that fulfill the condition.
 For 1-d arrays, this is a singleton tuple.
-The [0] indexing is needed to extract the result from the singleton tuple.
+The [0] indexing is needed toextract the result from the singleton tuple.
 """
 def where1d(condition):
     return np.where(condition)[0]
-
 
 def coord_to_point(row, col, boardsize):
     """
@@ -105,8 +97,8 @@ def coord_to_point(row, col, boardsize):
     NS = boardsize + 1
     return NS * row + col
 
-
 class GoBoardUtil(object):
+    
     @staticmethod
     def generate_legal_moves(board, color):
         """
@@ -126,10 +118,21 @@ class GoBoardUtil(object):
             if board.is_legal(move, color):
                 legal_moves.append(move)
         return legal_moves
-
+#### 
     @staticmethod
-    def generate_random_move(board, color):
+    def generate_legal_moves_gomoku(board):
+
+        moves = board.get_empty_points()
+        legal_moves = []
+        for move in moves:
+            legal_moves.append(move)
+        return legal_moves
+####    
+    @staticmethod
+    def generate_random_move(board):
         """
+        generate random moves only on gomoku.
+        
         Generate a random move.
         Return PASS if no move found
 
@@ -146,25 +149,24 @@ class GoBoardUtil(object):
         np.random.shuffle(moves)
         return moves[0]
 
-    @staticmethod
-    def generate_random_moves(board, use_eye_filter):
+    @staticmethod       
+    def generate_random_moves(board, color, use_eye_filter):
         """
-        Return a list of random (legal) moves with eye-filtering.
+        Return a list of random(legal) moves with  eye_filtering
+
         """
-        empty_points = board.get_empty_points()
-        color = board.current_player
-        moves = []
-        for move in empty_points:
-            legal = not (
-                use_eye_filter and board.is_eye(move, color)
-            ) and board.is_legal(move, color)
+        moves = board.get_empty_points()
+        np.random.shuffle(moves)
+        for move in moves:
+            legal = not (use_eye_filter and board.is_eye(move, color)) \
+                    and board.is_legal(move, color)
             if legal:
-                moves.append(move)
-        return moves
+                return move
+        return PASS
 
     @staticmethod
     def opponent(color):
-        return WHITE + BLACK - color
+        return WHITE + BLACK - color    
 
     @staticmethod
     def get_twoD_board(goboard):
@@ -175,8 +177,24 @@ class GoBoardUtil(object):
         Rows 1..size of goboard are copied into rows 0..size - 1 of board2d
         """
         size = goboard.size
-        board2d = np.zeros((size, size), dtype=GO_POINT)
+        board2d = np.zeros((size, size), dtype = GO_POINT)
         for row in range(size):
             start = goboard.row_start(row + 1)
             board2d[row, :] = goboard.board[start : start + size]
         return board2d
+
+    @staticmethod
+    def get_board_1d(board):
+        """
+        Return: numpy array
+        a one dimensional numpy array where the stone as the board
+
+        """
+
+        blackNum = where1d(board == BLACK)
+        whiteNum = where1d(board == WHITE)
+        emptyNum = where1d(board == EMPTY)
+
+        board1d = np.concatenate([blackNum,whiteNum,emptyNum])
+
+        return board1d
