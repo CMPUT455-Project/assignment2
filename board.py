@@ -118,7 +118,7 @@ class GoBoard(object):
         self.current_player = BLACK
         self.maxpoint = size * size + 3 * (size + 1)
         self.time = None
-        self.zobTable = self.code()
+        self.zobTable = None
         self.board = np.full(self.maxpoint, BORDER, dtype=GO_POINT)
         self._initialize_empty_points(self.board)
         self.calculate_rows_cols_diags()
